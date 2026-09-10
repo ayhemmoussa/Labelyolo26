@@ -39,6 +39,20 @@ def _clip_point(x, y, width, height):
     )
 
 
+def _rotation_handle(corners, offset=12.0):
+    """Rotation-handle point for a 4-corner "rotation" shape.
+
+    Mirrors Shape._rotation_handle_pos(): `offset` px outward from the middle
+    of the first edge. The canvas recomputes it when the shape is loaded.
+    """
+    tx = (corners[0][0] + corners[1][0]) / 2
+    ty = (corners[0][1] + corners[1][1]) / 2
+    cx = sum(x for x, _ in corners) / 4
+    cy = sum(y for _, y in corners) / 4
+    dist = math.hypot(tx - cx, ty - cy) or 1.0
+    return (tx + (tx - cx) / dist * offset, ty + (ty - cy) / dist * offset)
+
+
 def auto_label_image(yolo_model, image_path, class_list=None, img_size=640, conf_threshold=0.35):
     """Auto-label an image using an Ultralytics YOLO model.
 
@@ -207,25 +221,23 @@ def auto_label_image(yolo_model, image_path, class_list=None, img_size=640, conf
                             else str(cls_i)
                         )
 
-                    # corners is shape (4, 2): four (x, y) pixel-space corners.
-                    # Convert to a "rotation" shape: axis-aligned bbox + angle,
-                    # which matches what the OBB canvas tool produces and exports.
+                    # corners is shape (4, 2): the four rotated corners in pixel
+                    # space, in cyclic order. Keep them as-is in the 5-point
+                    # "rotation" format the OBB canvas tool produces (4 corners
+                    # + rotation handle). Converting to an axis-aligned bbox +
+                    # angle would inflate the box.
                     raw = [
                         _clip_point(float(corners[j, 0]), float(corners[j, 1]), w0, h0)
                         for j in range(4)
                     ]
-                    xs = [p[0] for p in raw]
-                    ys = [p[1] for p in raw]
-                    bx0, bx1 = min(xs), max(xs)
-                    by0, by1 = min(ys), max(ys)
-                    # Estimate rotation from the first edge direction
+                    # Angle of the first edge, stored like the canvas does
                     dx = raw[1][0] - raw[0][0]
                     dy = raw[1][1] - raw[0][1]
                     angle_deg = math.degrees(math.atan2(dy, dx))
 
                     shapes.append({
                         "label":       label,
-                        "points":      [(bx0, by0), (bx1, by1)],
+                        "points":      raw + [_rotation_handle(raw)],
                         "shape_type":  "rotation",
                         "flags":       {},
                         "group_id":    None,

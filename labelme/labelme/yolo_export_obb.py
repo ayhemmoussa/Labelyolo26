@@ -7,20 +7,24 @@ where (x1,y1)...(x4,y4) are the four corners of the rotated bounding box,
 normalised to [0, 1] relative to image width/height.
 
 Accepted annotation shapes:
-  • rotation (2-point bbox + rotation angle in other_data) → rotated corners
+  • rotation (4 corners + handle, or old 2-point bbox + angle) → corners
   • polygon with exactly 4 points  → corners used directly
   • rectangle (2-point)            → converted to 4 axis-aligned corners
   • other polygons                  → skipped with a console warning
 """
 
-import math
 import os
 import glob
 import json
-import shutil
 import random
 from PyQt5 import QtWidgets, QtCore
 import yaml
+
+from labelme.yolo_export_common import dataset_dirs
+from labelme.yolo_export_common import export_image
+from labelme.yolo_export_common import remove_from_dataset
+from labelme.yolo_export_common import resolve_image_path
+from labelme.yolo_export_common import rotation_corners
 
 
 def write_data_yaml(dataset_path, class_list):
@@ -47,25 +51,9 @@ def _shape_to_obb_line(shape, class_list, img_w, img_h):
     shape_type = shape.get("shape_type", "polygon")
     class_id = class_list.index(label)
 
-    if shape_type == "rotation" and len(points) >= 5:
-        # New 5-point format: points[0..3] are the 4 actual rotated corners, points[4] is the handle
-        corners = [(float(points[i][0]), float(points[i][1])) for i in range(4)]
-    elif shape_type == "rotation" and len(points) >= 2:
-        # Old format: points[0]=bbox TL, points[1]=bbox BR, other_data["rotation"]=degrees
-        p0x, p0y = float(points[0][0]), float(points[0][1])
-        p1x, p1y = float(points[1][0]), float(points[1][1])
-        cx = (p0x + p1x) / 2
-        cy = (p0y + p1y) / 2
-        hw = abs(p1x - p0x) / 2
-        hh = abs(p1y - p0y) / 2
-        # rotation is stored at top-level in JSON (format_shape merges other_data into the dict)
-        angle_deg = shape.get("rotation") or shape.get("other_data", {}).get("rotation") or 0.0
-        angle = math.radians(angle_deg)
-        cos_a = math.cos(angle)
-        sin_a = math.sin(angle)
-        corners = []
-        for lx, ly in [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]:
-            corners.append((cx + lx * cos_a - ly * sin_a, cy + lx * sin_a + ly * cos_a))
+    if shape_type == "rotation" and len(points) >= 2:
+        # 4 corners + handle (current format) or 2-point bbox + angle (old format)
+        corners = rotation_corners(shape)
     elif shape_type == "rectangle" and len(points) == 2:
         # Convert axis-aligned rectangle to 4 OBB corners
         x1, y1 = points[0]
@@ -262,6 +250,7 @@ def export_to_yolo_obb(
     json_files = glob.glob(os.path.join(lastOpenDir, "*.json"))
     labeled = []
     verified_empty_images = []
+    unlabeled_images = []  # Images with no shapes (stale copies get removed)
 
     for json_file in json_files:
         try:
@@ -274,19 +263,12 @@ def export_to_yolo_obb(
         is_verified_empty = data.get("verified_empty", False)
 
         if not shapes and not is_verified_empty:
+            # Nothing to export, but remember it so a stale copy from an
+            # earlier export (shapes since deleted) is dropped from the dataset
+            unlabeled_images.append(resolve_image_path(data, json_file, lastOpenDir))
             continue
 
-        image_path = data.get("imagePath", "")
-        candidates = [
-            os.path.join(lastOpenDir, image_path),
-            os.path.join(os.path.dirname(json_file), image_path),
-            image_path,
-        ]
-        abs_image_path = None
-        for candidate in candidates:
-            if os.path.exists(candidate):
-                abs_image_path = candidate
-                break
+        abs_image_path = resolve_image_path(data, json_file, lastOpenDir)
         if not abs_image_path:
             continue
 
@@ -326,46 +308,21 @@ def export_to_yolo_obb(
     progress.show()
     QtWidgets.QApplication.processEvents()
 
-    def image_split(image_filename):
-        if os.path.exists(os.path.join(images_train_dir, image_filename)):
-            return 'train'
-        if os.path.exists(os.path.join(images_val_dir, image_filename)):
-            return 'val'
-        return None
+    # Images already in the dataset (matched by content) keep their split and
+    # get their label updated; new images are copied in under a free name
+    dirs = dataset_dirs(export_dir)
+    for i, (abs_image_path, lines) in enumerate(train_set + val_set):
+        default_split = "train" if i < len(train_set) else "val"
+        export_image(abs_image_path, lines, default_split, dirs)
 
-    def write_set(image_set, default_split):
-        for i, (abs_image_path, lines) in enumerate(image_set):
-            image_filename = os.path.basename(abs_image_path)
-            label_filename = os.path.splitext(image_filename)[0] + ".txt"
-            split = image_split(image_filename) or default_split
-            target_label_path = os.path.join(
-                labels_train_dir if split == 'train' else labels_val_dir, label_filename
-            )
-            with open(target_label_path, "w") as f:
-                f.write("\n".join(lines))
-            if image_split(image_filename) is None:
-                target_image_path = os.path.join(
-                    images_train_dir if split == 'train' else images_val_dir, image_filename
-                )
-                shutil.copy2(abs_image_path, target_image_path)
-            yield i
-
-    count = 0
-    for _ in write_set(train_set, 'train'):
-        count += 1
-        progress.setValue(count)
+        progress.setValue(i + 1)
         QtWidgets.QApplication.processEvents()
         if progress.wasCanceled():
             parent.status("Export cancelled.")
             return
 
-    for _ in write_set(val_set, 'val'):
-        count += 1
-        progress.setValue(count)
-        QtWidgets.QApplication.processEvents()
-        if progress.wasCanceled():
-            parent.status("Export cancelled.")
-            return
+    # Drop dataset copies of images whose shapes were all deleted
+    removed = sum(remove_from_dataset(p, dirs) for p in unlabeled_images if p)
 
     progress.setValue(total)
 
@@ -373,6 +330,13 @@ def export_to_yolo_obb(
     if total_verified_empty > 0:
         status_msg += f" (Includes {total_verified_empty} verified empty images)"
     parent.status(status_msg)
+    if removed:
+        QtWidgets.QMessageBox.information(
+            parent,
+            "Stale Images Removed",
+            f"Removed {removed} image(s) from the dataset because all of their "
+            "shapes were deleted since the last export.",
+        )
 
     if hasattr(parent, 'projectLabelList'):
         parent.projectLabelList.clear()

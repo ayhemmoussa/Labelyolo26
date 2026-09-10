@@ -101,6 +101,7 @@ a = Analysis(
         'labelme.yolo_export',
         'labelme.yolo_export_bbx',
         'labelme.yolo_export_obb',
+        'labelme.yolo_export_common',
         'labelme.yolo_train',
         'labelme.yolo_train_bbx',
         'labelme.yolo_train_obb',

@@ -1,11 +1,16 @@
 import os
 import glob
 import json
-import shutil
 import random
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 import yaml
+
+from labelme.yolo_export_common import dataset_dirs
+from labelme.yolo_export_common import export_image
+from labelme.yolo_export_common import remove_from_dataset
+from labelme.yolo_export_common import resolve_image_path
+from labelme.yolo_export_common import shape_outline
 
 def write_data_yaml(dataset_path, class_list):
     data_yaml_path = os.path.join(dataset_path, "data.yaml")
@@ -204,6 +209,7 @@ def export_to_yolov5(
     json_files = glob.glob(os.path.join(lastOpenDir, "*.json"))
     labeled = []
     verified_empty_images = []  # Track images marked as verified empty
+    unlabeled_images = []  # Images with no shapes (stale copies get removed)
     
     for json_file in json_files:
         try:
@@ -217,20 +223,12 @@ def export_to_yolov5(
         is_verified_empty = data.get("verified_empty", False)
 
         if not shapes and not is_verified_empty:
-            continue  # skip images with no labels and not verified empty
+            # Nothing to export, but remember it so a stale copy from an
+            # earlier export (shapes since deleted) is dropped from the dataset
+            unlabeled_images.append(resolve_image_path(data, json_file, lastOpenDir))
+            continue
 
-        image_path = data.get("imagePath", "")
-        # Try several ways to resolve the image path
-        candidates = [
-            os.path.join(lastOpenDir, image_path),
-            os.path.join(os.path.dirname(json_file), image_path),
-            image_path,  # in case it's absolute
-        ]
-        abs_image_path = None
-        for candidate in candidates:
-            if os.path.exists(candidate):
-                abs_image_path = candidate
-                break
+        abs_image_path = resolve_image_path(data, json_file, lastOpenDir)
         if not abs_image_path:
             continue  # skip if image not found
 
@@ -244,16 +242,20 @@ def export_to_yolov5(
             verified_empty_images.append((abs_image_path, []))
             continue
 
-        # Prepare YOLOv5 label lines
+        # Prepare YOLO segmentation label lines
         lines = []
         for shape in shapes:
             label = shape["label"]
             if label not in class_list:
                 continue
+            # Rectangles, rotated boxes and circles become polygons; shapes
+            # without an area (lines, points) can't be segmentation labels
+            outline = shape_outline(shape)
+            if outline is None:
+                continue
             class_id = class_list.index(label)
-            points = shape["points"]
             norm_points = []
-            for x, y in points:
+            for x, y in outline:
                 norm_points.append(f"{max(0.0, min(1.0, x / img_w)):.6f}")
                 norm_points.append(f"{max(0.0, min(1.0, y / img_h)):.6f}")
             line = f"{class_id} " + " ".join(norm_points)
@@ -282,36 +284,12 @@ def export_to_yolov5(
     progress.show()
     QtWidgets.QApplication.processEvents()
 
-    def image_split(image_filename):
-        if os.path.exists(os.path.join(images_train_dir, image_filename)):
-            return 'train'
-        if os.path.exists(os.path.join(images_val_dir, image_filename)):
-            return 'val'
-        return None
-
-    # Export train
-    for i, (abs_image_path, lines) in enumerate(train_set):
-        image_filename = os.path.basename(abs_image_path)
-        label_filename = os.path.splitext(image_filename)[0] + ".txt"
-        split = image_split(image_filename)
-
-        if split == 'train':
-            # Image exists in train, update label in train
-            target_label_path = os.path.join(labels_train_dir, label_filename)
-            with open(target_label_path, "w") as f:
-                f.write("\n".join(lines))
-        elif split == 'val':
-            # Image exists in val, update label in val
-            target_label_path = os.path.join(labels_val_dir, label_filename)
-            with open(target_label_path, "w") as f:
-                f.write("\n".join(lines))
-        else:
-            # Image does not exist, copy to train and write label
-            target_image_path = os.path.join(images_train_dir, image_filename)
-            target_label_path = os.path.join(labels_train_dir, label_filename)
-            shutil.copy2(abs_image_path, target_image_path)
-            with open(target_label_path, "w") as f:
-                f.write("\n".join(lines))
+    # Images already in the dataset (matched by content) keep their split and
+    # get their label updated; new images are copied in under a free name
+    dirs = dataset_dirs(export_dir)
+    for i, (abs_image_path, lines) in enumerate(train_set + val_set):
+        default_split = "train" if i < len(train_set) else "val"
+        export_image(abs_image_path, lines, default_split, dirs)
 
         progress.setValue(i)
         QtWidgets.QApplication.processEvents()
@@ -319,35 +297,8 @@ def export_to_yolov5(
             parent.status("Export cancelled.")
             return
 
-    # Export val
-    for j, (abs_image_path, lines) in enumerate(val_set):
-        image_filename = os.path.basename(abs_image_path)
-        label_filename = os.path.splitext(image_filename)[0] + ".txt"
-        split = image_split(image_filename)
-
-        if split == 'train':
-            # Image exists in train, update label in train
-            target_label_path = os.path.join(labels_train_dir, label_filename)
-            with open(target_label_path, "w") as f:
-                f.write("\n".join(lines))
-        elif split == 'val':
-            # Image exists in val, update label in val
-            target_label_path = os.path.join(labels_val_dir, label_filename)
-            with open(target_label_path, "w") as f:
-                f.write("\n".join(lines))
-        else:
-            # Image does not exist, copy to val and write label
-            target_image_path = os.path.join(images_val_dir, image_filename)
-            target_label_path = os.path.join(labels_val_dir, label_filename)
-            shutil.copy2(abs_image_path, target_image_path)
-            with open(target_label_path, "w") as f:
-                f.write("\n".join(lines))
-
-        progress.setValue(len(train_set) + j)
-        QtWidgets.QApplication.processEvents()
-        if progress.wasCanceled():
-            parent.status("Export cancelled.")
-            return
+    # Drop dataset copies of images whose shapes were all deleted
+    removed = sum(remove_from_dataset(p, dirs) for p in unlabeled_images if p)
 
     progress.setValue(total)
     
@@ -356,6 +307,13 @@ def export_to_yolov5(
     if total_verified_empty > 0:
         status_msg += f" (Includes {total_verified_empty} verified empty images)"
     parent.status(status_msg)
+    if removed:
+        QtWidgets.QMessageBox.information(
+            parent,
+            "Stale Images Removed",
+            f"Removed {removed} image(s) from the dataset because all of their "
+            "shapes were deleted since the last export.",
+        )
     
     # Update Project Labels UI with merged label list (always update to ensure sync)
     if hasattr(parent, 'projectLabelList'):
