@@ -1,0 +1,35 @@
+# Core LabelMe Dependencies
+PyQt5>=5.15.0
+Pillow>=8.0.0
+loguru>=0.6.0
+
+# YOLO and ML Dependencies
+ultralytics>=8.4.37
+torch>=2.0.0
+torchvision>=0.15.0
+opencv-python-headless>=4.5.0
+numpy>=1.20.0
+matplotlib>=3.5.0
+scipy>=1.7.0
+pyyaml>=6.0
+tqdm>=4.60.0
+pandas>=1.3.0
+
+# Image Processing
+scikit-image>=0.18.0
+albumentations>=1.0.0
+supervision>=0.17.0
+
+# Additional ML Tools
+scikit-learn>=1.0.0
+psutil>=5.8.0
+
+# PyQt5 Charts (if needed)
+# PyQt5-Chart
+
+# System utilities
+requests>=2.25.0
+filelock>=3.0.0
+
+# Optional but recommended
+# segment-anything

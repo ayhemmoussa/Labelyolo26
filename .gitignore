@@ -1,0 +1,55 @@
+# Model weights (too large for GitHub — keep locally)
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.onnx
+*.ckpt
+
+# Bundled Magic Label models (Grounding DINO + SAM2, ~850 MB).
+# If this folder is missing, Magic Label downloads the models from Hugging Face
+# on first use. See README for how to populate it before building the .exe.
+labelme/labelme/models/
+
+# Hugging Face download cache / partial downloads
+.cache/
+*.incomplete
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments / packaging
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build artifacts
+build/
+dist/
+*.spec.bak
+
+# Training outputs and exported datasets
+runs/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / local agent settings
+.vscode/
+.idea/
+.claude/
+
+# Logs and temp
+*.log
+*.tmp
