@@ -459,3 +459,18 @@ coll = COLLECT(
     upx_exclude=[],
     name='labelyolo26'
 )
+
+# ── License files ────────────────────────────────────────────────────────────
+# GPL/AGPL (labelme, PyQt5, Ultralytics) and the Apache/BSD/MIT licenses of the
+# bundled packages require their license texts to ship with the binaries.
+import runpy
+import shutil
+
+_out_dir = os.path.join(DISTPATH, 'labelyolo26')
+for _name in ('LICENSE', 'THIRD_PARTY_NOTICES.md'):
+    shutil.copy(os.path.join(SPECPATH, '..', _name), _out_dir)
+_licenses = runpy.run_path(os.path.join(SPECPATH, 'tools', 'gen_third_party_licenses.py'))
+_licenses['write_license_texts'](
+    _licenses['top_level_names'](a.pure, a.binaries, a.datas),
+    os.path.join(_out_dir, 'THIRD_PARTY_LICENSES.txt'),
+)

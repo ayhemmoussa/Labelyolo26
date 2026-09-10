@@ -104,7 +104,7 @@ pip install pyinstaller
 pyinstaller LabelMe-YOLO-NoONNX.spec
 ```
 
-The output goes to `labelme/dist/labelyolo26/labelyolo26.exe`. Ship the whole `labelyolo26/` folder.
+The output goes to `labelme/dist/labelyolo26/labelyolo26.exe`. Ship the whole `labelyolo26/` folder. The build also puts `LICENSE`, `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES.txt` next to the exe; keep them with it, because the licenses require it (see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)).
 
 ## Project structure
 
@@ -137,6 +137,6 @@ Labelyolo26/
 
 ## License and credits
 
-- LabelYolo26 is based on **[labelme](https://github.com/wkentaro/labelme)** by Kentaro Wada and inherits its **GPL-3.0** license (see [`labelme/LICENSE`](labelme/LICENSE)).
-- Training and inference use **[Ultralytics](https://github.com/ultralytics/ultralytics)** YOLO, which is **AGPL-3.0**. Commercial use may require an Ultralytics Enterprise license.
-- Magic Label uses **[Grounding DINO](https://huggingface.co/IDEA-Research/grounding-dino-tiny)** (IDEA Research) and **[SAM 2](https://github.com/facebookresearch/sam2)** (Meta).
+LabelYolo26 is a modified version of **[labelme](https://github.com/wkentaro/labelme)** by Kentaro Wada. It is licensed under **GPL-3.0** (see [`LICENSE`](LICENSE)).
+
+It bundles third-party software and models under their own licenses. The most important are **Ultralytics YOLO (AGPL-3.0)**, **PyQt5 (GPL-3.0)**, and Grounding DINO and SAM 2 (Apache-2.0). See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the full list, and for what the licenses mean if you share the app outside your organisation.
