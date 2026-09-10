@@ -33,7 +33,7 @@ Tested with: `torch 2.5.1+cu121`, `torchvision 0.20.1`, `ultralytics 8.4.37`, `t
 ## Setup (from source)
 
 ```bash
-git clone https://github.com/<your-username>/Labelyolo26.git
+git clone https://github.com/ayhemmoussa/Labelyolo26.git
 cd Labelyolo26
 
 conda create -n labelme python=3.11 -y
