@@ -1,64 +1,88 @@
+<div align="center">
+
 # LabelYolo26
 
-A desktop image-annotation tool for building **YOLO26** datasets and training models, all in one app.
-LabelYolo26 is a fork of [labelme](https://github.com/wkentaro/labelme) (5.8.3). It adds YOLO dataset export, GPU training and retraining, and AI-assisted labelling with your own YOLO models or with text prompts (Grounding DINO + SAM2).
+**Label images, build YOLO datasets and train YOLO26 models in one desktop app, with zero-shot auto-labelling from text prompts.**
 
-It supports three task types:
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-CUDA-EE4C2C?logo=pytorch&logoColor=white)
+![Ultralytics YOLO26](https://img.shields.io/badge/Ultralytics-YOLO26-111F68)
+![Grounding DINO + SAM2](https://img.shields.io/badge/Grounding%20DINO-%2B%20SAM2-8A2BE2)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)
 
-| Mode | Shapes you draw | YOLO task |
-|---|---|---|
-| **Segmentation** | Polygons | `yolo26*-seg` |
-| **Bounding Box** | Axis-aligned rectangles | `yolo26*` (detect) |
-| **OBB** | Rotated rectangles | `yolo26*-obb` |
+<img src="docs/images/magic-label.jpg" alt="Magic Label: the prompt 'bus, car, headlight, license plate, windshield' produced 9 polygons with Grounding DINO + SAM2" width="900">
 
-## Features
+<sub>Magic Label on a sample image: the prompt <code>bus, car, headlight, license plate, windshield</code> gave 9 polygons with no trained model.</sub>
 
-- **Task type switcher**: pick Segmentation, Bounding Box or OBB when you start. Menus, export and training follow the mode you choose.
-- **Auto Label**: load a trained YOLO model and label the current image or a whole folder in one batch, with a confidence threshold.
-- **Magic Label**: type the class names (e.g. `car seat, buckle, headrest`). Grounding DINO finds the objects and SAM2 turns each box into a precise polygon. You don't need a trained model. It runs on GPU if one is available and falls back to CPU.
-- **Verified Empty** (`E`): mark an image as having no objects so it's exported as a background image.
-- **Export YOLO**: writes a ready-to-train dataset (`images/`, `labels/`, `data.yaml`) with a train/val split slider. It merges classes with any existing dataset and updates images already in the dataset in place.
-- **Train YOLO / Retrain YOLO**: train from the YOLO26 base models (n/s/m/l/x) or fine-tune existing weights. You get live loss and mAP charts, per-class metrics at the end, and an instant Cancel, because training runs in its own process.
-- **Dataset tools**: Augment Dataset, Explore Dataset (thumbnail browser for YOLO datasets), and Dataset Stats / Annotation Statistics.
-- **Dark theme** and a **standalone Windows `.exe`** built with PyInstaller.
+</div>
 
-## Requirements
+---
 
-- Windows 10/11 (the `.exe` build and DLL handling are Windows-specific; running from source should also work on Linux)
-- **NVIDIA GPU with CUDA** for training. CPU training is disabled on purpose. Magic Label and Auto Label also work on CPU, just more slowly.
-- Python 3.11 (developed with 3.11.13)
+## Why LabelYolo26?
 
-Tested with: `torch 2.5.1+cu121`, `torchvision 0.20.1`, `ultralytics 8.4.37`, `transformers 5.3.0`, `sam2 1.1.0`, `PyQt5 5.15.11`, `pyinstaller 6.16.0`.
+Training a custom YOLO model usually means juggling an annotation tool, conversion scripts, a training CLI and a lot of manual polygon clicking. LabelYolo26 puts the whole loop in one app:
 
-## Setup (from source)
+```
+ label (by hand, by text prompt or with your own model)  →  export YOLO dataset  →  train on GPU  →  auto-label more images  →  retrain
+```
+
+It is a fork of [labelme](https://github.com/wkentaro/labelme) 5.8.3, extended for production computer-vision work. I built it to cut annotation time on industrial inspection projects.
+
+## Highlights
+
+| | |
+|---|---|
+| **Magic Label (zero-shot)** | Type class names. **Grounding DINO** finds the objects and **SAM2** turns each box into a precise polygon. No trained model needed. GPU when available, CPU fallback. |
+| **Auto Label** | Load your own YOLO weights and label the current image or a whole folder, with a confidence threshold. |
+| **3 task types** | Segmentation (polygons), Bounding Box, and **Oriented Bounding Box (OBB)**. Menus, export and training follow the selected mode. |
+| **Export YOLO** | Writes a ready-to-train dataset (`images/`, `labels/`, `data.yaml`) with a train/val slider. Merges classes with an existing dataset and updates images in place. |
+| **Train & Retrain** | Train YOLO26 n/s/m/l/x or fine-tune existing weights. Live loss and mAP charts, per-class metrics, and an instant Cancel because training runs in its own process. |
+| **Dataset tools** | Augmentation, a thumbnail dataset explorer, dataset and annotation statistics, and **Verified Empty** (`E`) for background images. |
+| **Ships as an .exe** | Dark theme, standalone Windows build with PyInstaller. Operators can use it with no Python installed. |
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/segmentation.jpg" alt="Segmentation mode"><br><sub><b>Segmentation:</b> polygon annotation with the AI tools in the toolbar</sub></td>
+<td width="50%"><img src="docs/images/bounding-box.jpg" alt="Bounding box mode"><br><sub><b>Bounding Box:</b> detection labelling</sub></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><img src="docs/images/task-type.jpg" alt="Task type picker" width="520"><br><sub>Choose the task type at startup: Segmentation, Bounding Box or OBB</sub></td>
+</tr>
+</table>
+
+## Quick start
+
+**Requirements:** Python 3.11, Windows 10/11 or Linux, and an **NVIDIA GPU with CUDA** for training. CPU training is disabled on purpose. Magic Label and Auto Label also run on CPU, more slowly.
 
 ```bash
 git clone https://github.com/ayhemmoussa/Labelyolo26.git
 cd Labelyolo26
 
-conda create -n labelme python=3.11 -y
-conda activate labelme
+conda create -n labelyolo python=3.11 -y
+conda activate labelyolo
 
 # 1. PyTorch with CUDA (pick the index URL that matches your driver)
 pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
 
-# 2. The app itself (editable install) + Magic Label dependencies
+# 2. The app (editable install) + Magic Label dependencies
 pip install -e ./labelme
 pip install transformers sam2
-```
 
-Run it:
-
-```bash
+# 3. Run
 labelme            # or: python -m labelme
 ```
 
-### Model weights (not stored in git)
+Tested with `torch 2.5.1+cu121`, `torchvision 0.20.1`, `ultralytics 8.4.37`, `transformers 5.3.0`, `sam2 1.1.0`, `PyQt5 5.15.11`, `pyinstaller 6.16.0`.
 
-Weights are too large for GitHub, so they're excluded by `.gitignore`.
+### Model weights
 
-- **YOLO26 base models** (`yolo26n-seg.pt`, `yolo26n-obb.pt`, …): Ultralytics downloads them automatically the first time you train. To bundle them into the `.exe`, put them in the repository root.
-- **Magic Label models**: when these are missing, they're downloaded from Hugging Face on first use. To use them offline or bundle them into the `.exe`, download them into `labelme/labelme/models/`:
+Weights are not stored in git.
+
+- **YOLO26 base models** (`yolo26n-seg.pt`, `yolo26n-obb.pt`, …) are downloaded by Ultralytics the first time you train. To bundle them into the `.exe`, put them in the repository root.
+- **Magic Label models** are downloaded from Hugging Face on first use. To work offline or bundle them into the `.exe`, download them into `labelme/labelme/models/`:
 
   ```bash
   hf download IDEA-Research/grounding-dino-tiny --local-dir labelme/labelme/models/grounding_dino_tiny
@@ -70,14 +94,14 @@ Weights are too large for GitHub, so they're excluded by `.gitignore`.
 ## Typical workflow
 
 1. **Choose the task type** (Segmentation / Bounding Box / OBB).
-2. **Open Dir** with your images.
-3. **Set Dataset Path**: the folder where the YOLO dataset and training runs are written.
-4. **Annotate**: draw shapes by hand, or speed things up with **Magic Label** (text prompt) or **Auto Label** (trained model). Press `E` on images that have no objects.
-5. **Export YOLO**: choose the train/val split.
+2. **Open Images** from a folder.
+3. **Select Project**: the folder where the YOLO dataset and training runs are written.
+4. **Annotate** by hand, or speed up with **Magic Label** (text prompt) or **Auto Label** (trained model). Press `E` on images with no objects.
+5. **Export YOLO** with your train/val split.
 6. **Train YOLO**: pick model size, epochs, batch size, image size and GPU.
-7. Use the new `best.pt` with **Auto Label** on more images, fix the results, re-export, then **Retrain YOLO**.
+7. Use the new `best.pt` with **Auto Label** on more images, correct the results, re-export and **Retrain YOLO**. Each round needs less manual work.
 
-The dataset folder ends up looking like this:
+The dataset folder ends up like this:
 
 ```
 <dataset>/
@@ -90,6 +114,20 @@ The dataset folder ends up looking like this:
     ├── train/exp*/         # bounding-box runs
     └── train-obb/exp*/     # OBB runs   (weights in exp*/weights/best.pt)
 ```
+
+## How Magic Label works
+
+```
+text prompt ──► Grounding DINO (open-vocabulary detector) ──► boxes + labels
+                                                                │
+image ─────────────────────────────────────────────────────────►│
+                                                                ▼
+                                       SAM2 (box-prompted segmentation) ──► masks
+                                                                ▼
+                                    mask → polygon simplification ──► labelme shapes
+```
+
+Detected phrases are mapped back to your exact class names. If SAM2 is not installed, or fails on one object, that object falls back to a rectangle so you never lose a detection. The code is in [`labelme/labelme/magic_label.py`](labelme/labelme/magic_label.py).
 
 ## Building the Windows executable
 
@@ -104,7 +142,7 @@ pip install pyinstaller
 pyinstaller LabelMe-YOLO-NoONNX.spec
 ```
 
-The output goes to `labelme/dist/labelyolo26/labelyolo26.exe`. Ship the whole `labelyolo26/` folder. The build also puts `LICENSE`, `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES.txt` next to the exe; keep them with it, because the licenses require it (see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)).
+The output goes to `labelme/dist/labelyolo26/labelyolo26.exe`. Ship the whole `labelyolo26/` folder. The build also puts `LICENSE`, `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES.txt` next to the exe. Keep them with it, because the licenses require it (see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)).
 
 ## Project structure
 
@@ -132,11 +170,24 @@ Labelyolo26/
 │   ├── requirements-exe.txt
 │   ├── tests/                      # Tests from the original labelme
 │   └── examples/                   # Examples from the original labelme
+├── docs/images/                    # README screenshots
 └── yolo26*.pt                      # (git-ignored) base weights bundled into the .exe
 ```
+
+## Contributing
+
+Issues and pull requests are welcome. For a bug, include your OS, GPU / CUDA version, the task type, and the steps to reproduce it.
 
 ## License and credits
 
 LabelYolo26 is a modified version of **[labelme](https://github.com/wkentaro/labelme)** by Kentaro Wada. It is licensed under **GPL-3.0** (see [`LICENSE`](LICENSE)).
 
-It bundles third-party software and models under their own licenses. The most important are **Ultralytics YOLO (AGPL-3.0)**, **PyQt5 (GPL-3.0)**, and Grounding DINO and SAM 2 (Apache-2.0). See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the full list, and for what the licenses mean if you share the app outside your organisation.
+It builds on **Ultralytics YOLO (AGPL-3.0)**, **PyQt5 (GPL-3.0)**, and **Grounding DINO** and **SAM 2** (Apache-2.0). See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the full list, and for what the licenses mean if you share the app outside your organisation.
+
+The screenshots use sample images from the labelme examples (PASCAL VOC 2011).
+
+---
+
+<div align="center">
+Made by <a href="https://github.com/ayhemmoussa">Ayhem Moussa</a>, Computer Vision Engineer · <a href="https://linkedin.com/in/ayhem-moussa-55514a180">LinkedIn</a>
+</div>

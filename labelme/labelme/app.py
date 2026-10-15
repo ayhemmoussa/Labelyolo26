@@ -3906,7 +3906,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # In explore mode (navigating a YOLO dataset) there is no JSON label file;
         # load shapes from the corresponding .txt label file instead.
-        if self._explore_image_list and not self.labelFile:
+        if getattr(self, "_explore_image_list", None) and not self.labelFile:
             self._load_explore_yolo_labels(str(filename))
 
         if self._config["keep_prev"] and self.noShapes():
